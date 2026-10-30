@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>제주 역사문화 스탬프 투어</title>
-    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="top">
@@ -12,7 +11,23 @@
       <p>120곳의 역사문화 장소를 찾아 스탬프를 모으고, 나만의 답사 코스를 만들어 보세요</p>
     </header>
 
-    <main class="wrap">
+    <!-- API 호출에 실패해 1단계 파일 데이터로 보여 줄 때 나타나는 안내 -->
+    <div id="practice-banner" class="practice" role="status" hidden>
+      <p>
+        <strong>🧪 연습 모드</strong>
+        API에 연결하지 못해 1단계 파일 데이터로 보여 주고 있어요. 스탬프·찜·코스는 그대로 쓸 수 있지만 최신 자료가 아닐 수 있어요.
+      </p>
+      <p class="practice__reason">이유: <span id="practice-reason"></span></p>
+      <button id="practice-retry" type="button">다시 시도</button>
+    </div>
+
+    <!-- 자료를 불러오는 동안 표시 (준비되면 제거) -->
+    <div id="loading" class="loading" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      장소 정보를 불러오는 중이에요…
+    </div>
+
+    <main id="app" class="wrap" hidden>
       <!-- 내 진행 상황 -->
       <section class="banner" aria-label="내 스탬프 현황">
         <div class="banner__level">
@@ -30,7 +45,7 @@
         <div id="region-bars" class="banner__regions"></div>
       </section>
 
-      <!-- 제주 지역 날씨 (기상청 초단기실황, weather-data.js) -->
+      <!-- 제주 지역 날씨 (기상청 초단기실황, src/data/weather-data.js) -->
       <section id="weather" class="weather" aria-label="제주 지역 날씨" hidden>
         <div class="weather__head">
           <h2>🌤️ 제주 지역 날씨</h2>
@@ -72,6 +87,7 @@
             <option value="name">장소명순</option>
             <option value="region">지역순</option>
             <option value="category">분류순</option>
+            <option value="near">내 위치에서 가까운 순</option>
           </select>
         </label>
         <label class="check">
@@ -125,6 +141,10 @@
             <p id="course-summary" class="muted"></p>
             <ol id="course-list" class="course"></ol>
             <p id="course-empty" class="hint">카드의 ♡ 를 눌러 찜하면, 찜한 순서대로 지도에 선으로 이어집니다.</p>
+            <div class="course__actions">
+              <button id="course-maps" type="button" disabled>🧭 구글 지도 길찾기</button>
+              <button id="course-copy" type="button" disabled>📋 코스 복사</button>
+            </div>
           </section>
 
           <section class="panel">
@@ -134,10 +154,21 @@
             </div>
             <ul id="recent" class="recent"></ul>
             <p id="recent-empty" class="hint">아직 찍은 스탬프가 없습니다. 카드의 "스탬프 찍기"를 눌러 보세요.</p>
+            <div class="backup">
+              <button id="backup-export" type="button">💾 내 기록 내보내기</button>
+              <button id="backup-import" type="button">📂 불러오기</button>
+              <input id="backup-file" type="file" accept=".json,application/json" hidden />
+            </div>
+            <p class="hint">스탬프·찜·방문 메모는 이 브라우저에 저장돼요. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 내보내 두세요.</p>
           </section>
         </aside>
       </div>
     </main>
+
+    <footer class="foot">
+      <p id="data-source"></p>
+      <p>장소 정보: 제주특별자치도 제주역사문화 위치정보·일반정보 (공공데이터포털) · 날씨: 기상청</p>
+    </footer>
 
     <dialog id="detail">
       <article>
@@ -155,10 +186,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <!-- file:// 로 열어도 동작하도록 CSV 대신 JS 로 변환한 데이터를 불러옵니다 -->
-    <script src="data.js"></script>
-    <script src="jeju-outline.js"></script>
-    <script src="weather-data.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

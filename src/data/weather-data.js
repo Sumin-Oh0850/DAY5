@@ -1,6 +1,6 @@
 // 기상청 초단기실황 스냅샷. update-weather.mjs 로 갱신합니다.
-window.JEJU_WEATHER = {
- "fetchedAt": "2026-10-30T07:28:03.754Z",
+export default {
+ "fetchedAt": "2026-10-30T07:31:44.769Z",
  "items": [
   {
    "name": "제주시",

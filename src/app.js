@@ -1,6 +1,6 @@
 'use strict'
 
-// data.js 가 만든 window.JEJU_DATA (위치정보 + 일반정보 합본)
+// main.js 가 준비한 window.JEJU_DATA (API 의 위치정보 + 일반정보 합본, 실패 시 1단계 파일 데이터)
 const data = (window.JEJU_DATA || []).map((r) => ({
   ...r,
   // "제주특별자치도 제주시 ..." 에서 두 번째 단어(제주시/서귀포시)를 지역으로 사용
@@ -30,6 +30,8 @@ const els = {
   recent: $('recent'),
   recentEmpty: $('recent-empty'),
   stampClear: $('stamp-clear'),
+  courseMaps: $('course-maps'),
+  courseCopy: $('course-copy'),
   detail: $('detail'),
   dTitle: $('d-title'),
   dBody: $('d-body'),
@@ -40,6 +42,8 @@ const els = {
 
 // 설정 -------------------------------------------------------
 const RADIUS_M = 300 // 이 거리 안에 있으면 "현장 인증"
+const MEMO_MAX = 200 // 방문 메모 최대 글자 수
+const MAPS_MAX_STOPS = 11 // 구글 지도 길찾기 주소: 출발 1 + 경유 9 + 도착 1
 const MAP = { W: 600, H: 440, pad: 28 }
 
 const LEVELS = [
@@ -86,6 +90,7 @@ const tourByKey = new Map(tours.map((t) => [t.key, t]))
 // favs: 찜한 순서 그대로 = 나만의 답사 코스 순서
 const KEY_STAMPS = 'jeju-2step-stamps'
 const KEY_FAVS = 'jeju-2step-favs'
+const KEY_MEMOS = 'jeju-2step-memos' // memos: { [장소id]: 방문 메모 }
 function readStore(key, fallback) {
   try {
     const v = JSON.parse(localStorage.getItem(key))
@@ -111,10 +116,20 @@ function loadFavs() {
   const v = readStore(KEY_FAVS, [])
   return Array.isArray(v) ? v.filter((id) => byId.has(id)) : []
 }
+function loadMemos() {
+  const v = readStore(KEY_MEMOS, {})
+  const out = {}
+  for (const [id, text] of Object.entries(v && typeof v === 'object' ? v : {})) {
+    if (byId.has(Number(id)) && typeof text === 'string' && text.trim()) out[id] = text.trim().slice(0, MEMO_MAX)
+  }
+  return out
+}
 
 const state = {
   stamps: loadStamps(),
   favs: loadFavs(),
+  memos: loadMemos(),
+  myPos: null, // "가까운 순" 정렬에 쓰는 내 위치 { lat, lng }
   activeId: null,
   justStamped: null,
   busyId: null,
@@ -214,12 +229,18 @@ function getFiltered() {
   })
 
   const key = els.sort.value
-  if (key !== 'default') {
+  if (key === 'near') {
+    if (state.myPos) list.sort((a, b) => distanceKm(state.myPos, a) - distanceKm(state.myPos, b))
+  } else if (key !== 'default') {
     const field = { name: 'name', region: 'region', category: 'category' }[key]
     list.sort((a, b) => String(a[field]).localeCompare(String(b[field]), 'ko') || a.id - b.id)
   }
   return list
 }
+
+const fmtKm = (km) => (km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`)
+// "가까운 순" 정렬일 때 카드 주소 뒤에 붙이는 내 위치와의 직선거리
+const nearText = (r) => (els.sort.value === 'near' && state.myPos ? ` · 📍 ${fmtKm(distanceKm(state.myPos, r))}` : '')
 
 // 등급 / 진행 현황 -------------------------------------------
 function levelFor(count) {
@@ -314,7 +335,10 @@ function renderCards(list) {
 
       let action
       if (stamp) {
-        action = el('p', { className: 'stamp-done', textContent: `✓ ${fmtDate(stamp.at)} · ${methodLabel(stamp.method)}` })
+        action = el('p', {
+          className: 'stamp-done',
+          textContent: `✓ ${fmtDate(stamp.at)} · ${methodLabel(stamp.method)}${state.memos[r.id] ? ' · 📝 메모' : ''}`,
+        })
       } else {
         action = el('button', {
           type: 'button',
@@ -338,7 +362,7 @@ function renderCards(list) {
         ),
         el('h3', { textContent: r.name }),
         r.title && el('p', { className: 'title', textContent: r.title }),
-        el('p', { className: 'addr', textContent: r.address }),
+        el('p', { className: 'addr', textContent: r.address + nearText(r) }),
         action,
         stamp &&
           el(
@@ -524,6 +548,8 @@ function renderCourse() {
 
   els.courseEmpty.hidden = stops.length > 0
   els.courseClear.disabled = stops.length === 0
+  els.courseMaps.disabled = stops.length < 2 // 길찾기는 출발지와 도착지가 있어야 함
+  els.courseCopy.disabled = stops.length === 0
   els.courseSummary.textContent = stops.length
     ? `${stops.length}곳 · 총 ${total.toFixed(1)}km (직선거리 기준) · 스탬프 ${doneCount}/${stops.length}`
     : ''
@@ -643,11 +669,114 @@ function cancelStamp(id) {
 }
 
 els.stampClear.addEventListener('click', () => {
-  if (stampCount() && confirm(`찍은 스탬프 ${stampCount()}개를 모두 지울까요? 되돌릴 수 없습니다.`)) {
+  if (stampCount() && confirm(`찍은 스탬프 ${stampCount()}개와 방문 메모를 모두 지울까요? 되돌릴 수 없습니다.\n(필요하면 먼저 "내 기록 내보내기"로 백업하세요)`)) {
     state.stamps = {}
+    state.memos = {}
     writeStore(KEY_STAMPS, state.stamps)
+    writeStore(KEY_MEMOS, state.memos)
     render()
   }
+})
+
+// 방문 메모 ---------------------------------------------------
+function saveMemo(id, text) {
+  const t = text.trim().slice(0, MEMO_MAX)
+  if (t) state.memos[id] = t
+  else delete state.memos[id]
+  writeStore(KEY_MEMOS, state.memos)
+  renderCards(getFiltered()) // 카드의 "📝 메모" 표시 갱신 (열려 있는 상세는 그대로 둠)
+}
+
+// 상세 팝업의 메모 입력칸. 스탬프를 찍은 장소에서만 보임
+function memoBlock(id, stamped) {
+  const input = el('textarea', {
+    className: 'memo__input',
+    rows: 3,
+    maxLength: MEMO_MAX,
+    placeholder: `이곳에서 느낀 점이나 기억하고 싶은 것을 적어 보세요 (최대 ${MEMO_MAX}자)`,
+    value: state.memos[id] ?? '',
+  })
+  input.setAttribute('aria-label', '방문 메모')
+  const count = el('span', { className: 'memo__count', textContent: `${input.value.length}/${MEMO_MAX}` })
+  let timer = 0
+  input.addEventListener('input', () => {
+    count.textContent = `${input.value.length}/${MEMO_MAX}`
+    clearTimeout(timer)
+    timer = setTimeout(() => saveMemo(id, input.value), 300) // 입력이 멈추면 저장
+  })
+  input.addEventListener('blur', () => {
+    clearTimeout(timer)
+    saveMemo(id, input.value)
+  })
+  return el('div', { className: 'memo', hidden: !stamped }, el('h3', { textContent: '방문 메모' }), input, count)
+}
+
+// 내 기록 백업 / 복원 ----------------------------------------
+// 브라우저 저장소(localStorage)가 지워지거나 다른 기기로 옮길 때를 위해 JSON 파일로 저장/불러오기
+function exportBackup() {
+  const payload = {
+    app: 'jeju-stamp-tour',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    stamps: state.stamps,
+    favs: state.favs,
+    memos: state.memos,
+  }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+  const a = el('a', { href: url, download: `jeju-stamp-backup-${new Date().toISOString().slice(0, 10)}.json` })
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  toast('내 기록을 파일로 저장했어요.')
+}
+
+async function importBackup(file) {
+  try {
+    if (file.size > 1_000_000) throw new Error('파일이 너무 커요')
+    let json
+    try {
+      json = JSON.parse(await file.text())
+    } catch {
+      throw new Error('올바른 JSON 파일이 아니에요')
+    }
+    if (json?.app !== 'jeju-stamp-tour') throw new Error('이 사이트에서 내보낸 백업 파일이 아니에요')
+
+    // 파일 내용은 믿지 않고, 현재 장소 목록에 있는 것만 규칙에 맞게 걸러서 사용
+    const stamps = {}
+    for (const [id, s] of Object.entries(json.stamps ?? {})) {
+      if (byId.has(Number(id)) && s?.at && !Number.isNaN(Date.parse(s.at))) {
+        stamps[id] = { at: new Date(s.at).toISOString(), method: s.method === 'gps' ? 'gps' : 'manual' }
+      }
+    }
+    const favs = [...new Set((Array.isArray(json.favs) ? json.favs : []).map(Number).filter((id) => byId.has(id)))]
+    const memos = {}
+    for (const [id, text] of Object.entries(json.memos ?? {})) {
+      if (byId.has(Number(id)) && typeof text === 'string' && text.trim()) memos[id] = text.trim().slice(0, MEMO_MAX)
+    }
+
+    const summary = `스탬프 ${Object.keys(stamps).length}개 · 찜 ${favs.length}곳 · 메모 ${Object.keys(memos).length}개`
+    if (!confirm(`${summary} 를 불러올까요?\n지금 기록은 이 내용으로 바뀝니다.`)) return
+
+    state.stamps = stamps
+    state.favs = favs
+    state.memos = memos
+    writeStore(KEY_STAMPS, stamps)
+    writeStore(KEY_FAVS, favs)
+    writeStore(KEY_MEMOS, memos)
+    render()
+    toast(`백업을 불러왔어요. (${summary})`)
+  } catch (e) {
+    toast(`백업을 불러오지 못했어요: ${e.message}`)
+  }
+}
+
+$('backup-export').addEventListener('click', exportBackup)
+$('backup-import').addEventListener('click', () => $('backup-file').click())
+$('backup-file').addEventListener('change', (e) => {
+  const file = e.target.files[0]
+  e.target.value = '' // 같은 파일을 다시 골라도 change 가 일어나도록 초기화
+  if (file) importBackup(file)
 })
 
 // 찜 / 코스 --------------------------------------------------
@@ -706,6 +835,42 @@ els.courseClear.addEventListener('click', () => {
   }
 })
 
+// 코스를 구글 지도 길찾기로 열기 (찜한 순서 = 가는 순서, 자동차 기준)
+els.courseMaps.addEventListener('click', () => {
+  const stops = state.favs.map((id) => byId.get(id))
+  if (stops.length < 2) return
+  const used = stops.slice(0, MAPS_MAX_STOPS)
+  const point = (r) => `${r.lat},${r.lng}`
+  const params = new URLSearchParams({
+    api: '1',
+    origin: point(used[0]),
+    destination: point(used[used.length - 1]),
+    travelmode: 'driving',
+  })
+  if (used.length > 2) params.set('waypoints', used.slice(1, -1).map(point).join('|'))
+  window.open(`https://www.google.com/maps/dir/?${params}`, '_blank', 'noopener')
+  if (stops.length > used.length) {
+    toast(`구글 지도는 최대 ${MAPS_MAX_STOPS}곳까지 열 수 있어 앞의 ${used.length}곳만 열었어요.`)
+  }
+})
+
+// 코스를 글로 복사 (메신저, 메모장에 붙여넣기용)
+els.courseCopy.addEventListener('click', async () => {
+  const stops = state.favs.map((id) => byId.get(id))
+  if (!stops.length) return
+  const total = stops.reduce((sum, r, i) => sum + (i ? distanceKm(stops[i - 1], r) : 0), 0)
+  const text = [
+    `나만의 제주 답사 코스 (${stops.length}곳 · 총 ${total.toFixed(1)}km, 직선거리 기준)`,
+    ...stops.map((r, i) => `${i + 1}. ${r.name} - ${r.address}`),
+  ].join('\n')
+  try {
+    await navigator.clipboard.writeText(text)
+    toast('코스를 복사했어요. 메신저나 메모장에 붙여넣어 보세요.')
+  } catch {
+    toast('복사하지 못했어요. 브라우저의 클립보드 권한을 확인해 주세요.')
+  }
+})
+
 els.recent.addEventListener('click', (e) => {
   const li = e.target.closest('li')
   if (li && e.target.closest('button')) openDetail(Number(li.dataset.id))
@@ -757,6 +922,7 @@ function openDetail(id) {
       ['스탬프', stamp ? `✓ ${fmtDate(stamp.at)} · ${methodLabel(stamp.method)}` : '아직 찍지 않았어요'],
       ['테마 투어', `${tour.icon} ${tour.name}`],
     ]),
+    memoBlock(id, Boolean(stamp)),
     ...section('위치정보', [
       ['장소명', r.name],
       ['주소', r.address],
@@ -895,12 +1061,29 @@ function render() {
     const row = els.dBody.querySelector('dl dd')
     const stamp = state.stamps[state.activeId]
     if (row) row.textContent = stamp ? `✓ ${fmtDate(stamp.at)} · ${methodLabel(stamp.method)}` : '아직 찍지 않았어요'
+    const memoBox = els.dBody.querySelector('.memo')
+    if (memoBox) memoBox.hidden = !stamp // 스탬프가 없으면 메모칸을 숨김
   }
 }
 
-for (const input of [els.q, els.tour, els.category, els.region, els.stampState, els.sort, els.onlyFavs]) {
+for (const input of [els.q, els.tour, els.category, els.region, els.stampState, els.onlyFavs]) {
   input.addEventListener('input', render)
 }
+// "내 위치에서 가까운 순"은 먼저 현재 위치를 확인해야 함. 실패하면 기본 정렬로 되돌림
+els.sort.addEventListener('input', async () => {
+  if (els.sort.value === 'near') {
+    toast('현재 위치를 확인하는 중...', 8000)
+    const pos = await getPosition()
+    if (!pos) {
+      els.sort.value = 'default'
+      toast('현재 위치를 확인할 수 없어요. 위치 권한을 허용했는지 확인해 주세요.')
+      return render()
+    }
+    state.myPos = pos
+    els.toast.hidden = true
+  }
+  render()
+})
 els.reset.addEventListener('click', () => {
   els.q.value = els.tour.value = els.category.value = els.region.value = els.stampState.value = ''
   els.sort.value = 'default'
@@ -908,5 +1091,17 @@ els.reset.addEventListener('click', () => {
   render()
 })
 
+// 하단: 지금 보이는 장소 자료가 어디서 왔는지 표시
+function renderSource() {
+  const meta = window.JEJU_DATA_META || {}
+  const note = $('data-source')
+  if (meta.mode === 'live') {
+    note.textContent = `📡 장소 자료: 공공데이터포털 API 실시간 조회 (${new Date(meta.fetchedAt).toLocaleString('ko-KR')})`
+  } else {
+    note.textContent = '🧪 장소 자료: 1단계 파일 데이터 (연습 모드)'
+  }
+}
+
 render()
 renderWeather()
+renderSource()

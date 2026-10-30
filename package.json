@@ -1,0 +1,15 @@
+{
+  "name": "jeju-stamp-tour",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "update-weather": "node update-weather.mjs"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}

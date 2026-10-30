@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const ENV_PATH = process.env.KMA_ENV ?? path.join(here, '..', 'weather', '.env')
-const OUT = path.join(here, 'weather-data.js')
+const OUT = path.join(here, 'src', 'data', 'weather-data.js')
 const ENDPOINT = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst'
 
 // 격자 좌표: weather 프로젝트와 동일 (제주시 52,38 / 서귀포시 52,33)
@@ -17,14 +17,25 @@ const LOCATIONS = [
   { name: '서귀포시', nx: 52, ny: 33 },
 ]
 
-function readKey() {
-  if (process.env.KMA_SERVICE_KEY) return process.env.KMA_SERVICE_KEY
-  if (!existsSync(ENV_PATH)) {
-    throw new Error(`인증키를 찾을 수 없습니다. KMA_SERVICE_KEY 환경변수를 설정하거나 ${ENV_PATH} 를 준비하세요.`)
+// 찾는 순서: 환경변수 → 이 폴더의 .env.local(VITE_DATA_API_KEY) → ../weather/.env(KMA_SERVICE_KEY)
+function readFromEnvFile(file, names) {
+  if (!existsSync(file)) return ''
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const name = names.find((n) => line.startsWith(`${n}=`))
+    const value = name && line.slice(name.length + 1).trim().replace(/^["']|["']$/g, '')
+    if (value) return value
   }
-  const line = readFileSync(ENV_PATH, 'utf8').split(/\r?\n/).find((l) => l.startsWith('KMA_SERVICE_KEY='))
-  const key = line?.slice('KMA_SERVICE_KEY='.length).trim().replace(/^["']|["']$/g, '')
-  if (!key) throw new Error(`${ENV_PATH} 에 KMA_SERVICE_KEY 값이 없습니다.`)
+  return ''
+}
+
+function readKey() {
+  const key =
+    process.env.KMA_SERVICE_KEY ||
+    readFromEnvFile(path.join(here, '.env.local'), ['VITE_DATA_API_KEY']) ||
+    readFromEnvFile(ENV_PATH, ['KMA_SERVICE_KEY'])
+  if (!key) {
+    throw new Error(`인증키를 찾을 수 없습니다. 환경변수 KMA_SERVICE_KEY 를 설정하거나 .env.local(VITE_DATA_API_KEY) 또는 ${ENV_PATH} 를 준비하세요.`)
+  }
   return key
 }
 
@@ -102,6 +113,6 @@ for (const loc of LOCATIONS) {
 
 const out =
   '// 기상청 초단기실황 스냅샷. update-weather.mjs 로 갱신합니다.\n' +
-  'window.JEJU_WEATHER = ' + JSON.stringify({ fetchedAt: new Date().toISOString(), items }, null, 1) + ';\n'
+  'export default ' + JSON.stringify({ fetchedAt: new Date().toISOString(), items }, null, 1) + ';\n'
 writeFileSync(OUT, out, 'utf8')
 console.log('wrote', path.basename(OUT))
