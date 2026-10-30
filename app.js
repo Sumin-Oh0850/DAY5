@@ -158,8 +158,12 @@ function toast(message, ms = 3800) {
 // 지도 좌표 변환 --------------------------------------------
 // 전체 데이터 범위에 고정해서 필터를 바꿔도 지도 위치가 흔들리지 않게 함.
 // 경도 1도는 위도 1도보다 짧으므로 cos(위도) 로 보정해 실제 비율 유지
-const lats = data.map((r) => r.lat)
-const lngs = data.map((r) => r.lng)
+// jeju-outline.js (제주시/서귀포시 경계). 없으면 윤곽 없이 점만 그림
+const outline = window.JEJU_OUTLINE || []
+const outlinePts = outline.flatMap((r) => r.polygons.flat())
+// 지도 범위에 섬 윤곽 전체가 들어가도록 장소 좌표와 윤곽 좌표를 함께 사용
+const lats = [...data.map((r) => r.lat), ...outlinePts.map((p) => p[1])]
+const lngs = [...data.map((r) => r.lng), ...outlinePts.map((p) => p[0])]
 const minLat = Math.min(...lats), maxLat = Math.max(...lats)
 const minLng = Math.min(...lngs), maxLng = Math.max(...lngs)
 const kx = Math.cos(((minLat + maxLat) / 2) * (Math.PI / 180))
@@ -174,6 +178,16 @@ for (const r of data) {
   r.x = projectLng(r.lng)
   r.y = projectLat(r.lat)
 }
+
+// 윤곽 좌표를 SVG 경로 문자열로 미리 변환 (확대/축소 때는 선 굵기만 다시 지정)
+const outlinePaths = outline.map((region) => ({
+  name: region.name,
+  d: region.polygons
+    .map((ring) => 'M' + ring.map(([lng, lat]) => `${projectLng(lng).toFixed(1)},${projectLat(lat).toFixed(1)}`).join('L') + 'Z')
+    .join(''),
+}))
+// 한라산 백록담(해발 1,947m) 위치 - 방향 잡기용 표식
+const HALLASAN = { name: '한라산', x: projectLng(126.5292), y: projectLat(33.3617) }
 
 // 두 지점 사이 직선거리(km)
 function distanceKm(a, b) {
@@ -378,6 +392,21 @@ function renderMap(list) {
     grid.append(svg('line', { x1: x, y1: 0, x2: x, y2: MAP.H }))
   }
   map.append(grid)
+
+  // 제주도 윤곽: 제주시/서귀포시를 다른 색으로 구분 (바다는 배경색)
+  outlinePaths.forEach((region) => {
+    // 색은 시 이름 기준 (범례와 일치): 제주시 = 0, 서귀포시 = 1
+    map.append(svg('path', { class: `land land--${region.name === '제주시' ? 0 : 1}`, d: region.d, 'stroke-width': 1.2 * s, 'stroke-linejoin': 'round' }, region.name))
+  })
+  if (outlinePaths.length) {
+    const peak = svg('path', {
+      class: 'peak',
+      d: `M${HALLASAN.x},${HALLASAN.y - 6 * s}L${HALLASAN.x + 5.5 * s},${HALLASAN.y + 4 * s}L${HALLASAN.x - 5.5 * s},${HALLASAN.y + 4 * s}Z`,
+    }, '한라산 (1,947m)')
+    const label = svg('text', { class: 'peak-label', x: HALLASAN.x, y: HALLASAN.y + 15 * s, 'font-size': 10 * s })
+    label.textContent = HALLASAN.name
+    map.append(peak, label)
+  }
 
   // 조회 결과 점: 스탬프를 찍은 곳은 초록색 (코스에 든 곳은 아래에서 번호 마커로 그림)
   for (const r of list) {

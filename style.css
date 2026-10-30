@@ -11,6 +11,10 @@
   --done: #2f9e44;
   --done-soft: #e6f6ea;
   --seal: #c92a2a;
+  --sea: #cfe8f5;
+  --land-0: #f4ecd0;
+  --land-1: #e3efcf;
+  --land-edge: #8ea37a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +31,10 @@
     --done: #51cf66;
     --done-soft: #1a3322;
     --seal: #ff8787;
+    --sea: #12303d;
+    --land-0: #4a4a38;
+    --land-1: #36493a;
+    --land-edge: #6f8f78;
   }
 }
 
@@ -197,7 +205,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   display: block;
   width: 100%;
   height: auto;
-  background: var(--brand-soft);
+  background: var(--sea);
   border-radius: 8px;
   cursor: grab;
   touch-action: none;
@@ -205,6 +213,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 #map.dragging { cursor: grabbing; }
 #map .grid { stroke: var(--brand); stroke-opacity: 0.18; fill: none; }
+#map .land { stroke: var(--land-edge); }
+#map .land--0 { fill: var(--land-0); }
+#map .land--1 { fill: var(--land-1); }
+#map .peak { fill: var(--land-edge); pointer-events: none; }
+#map .peak-label { fill: var(--muted); text-anchor: middle; pointer-events: none; }
 #map .dot { fill: var(--brand); fill-opacity: 0.55; stroke: #fff; cursor: pointer; }
 #map .dot.done { fill: var(--done); fill-opacity: 1; }
 #map .dot:hover { fill: var(--accent); fill-opacity: 1; }
@@ -220,6 +233,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .lg--todo { background: var(--brand); opacity: 0.55; }
 .lg--done { background: var(--done); }
 .lg--stop { background: var(--accent); }
+.lg--land0, .lg--land1 { border-radius: 2px; border: 1px solid var(--land-edge); }
+.lg--land0 { background: var(--land-0); }
+.lg--land1 { background: var(--land-1); }
+.credit { font-size: 0.72rem; }
 
 /* 테마 투어 */
 .tours { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.45rem; }
