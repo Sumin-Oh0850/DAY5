@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>제주 역사문화 스탬프 투어</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>🗿 제주 역사문화 스탬프 투어</h1>
+      <p>120곳의 역사문화 장소를 찾아 스탬프를 모으고, 나만의 답사 코스를 만들어 보세요</p>
+    </header>
+
+    <main class="wrap">
+      <!-- 내 진행 상황 -->
+      <section class="banner" aria-label="내 스탬프 현황">
+        <div class="banner__level">
+          <span id="level-icon" class="banner__icon" aria-hidden="true"></span>
+          <div>
+            <p class="banner__label">나의 등급</p>
+            <p id="level-name" class="banner__name"></p>
+          </div>
+        </div>
+        <div class="banner__main">
+          <p class="banner__count"><strong id="stamp-count">0</strong> / <span id="stamp-total">0</span> 스탬프</p>
+          <div class="bar" role="progressbar" aria-label="전체 스탬프 진행률" id="total-bar"><span id="total-fill"></span></div>
+          <p id="next-goal" class="banner__next"></p>
+        </div>
+        <div id="region-bars" class="banner__regions"></div>
+      </section>
+
+      <section class="filters" aria-label="검색 조건">
+        <label class="grow">
+          검색어
+          <input id="q" type="search" placeholder="장소명, 제목, 주소, 주제, 내용" autocomplete="off" />
+        </label>
+        <label>
+          테마 투어
+          <select id="tour"><option value="">전체</option></select>
+        </label>
+        <label>
+          분류
+          <select id="category"><option value="">전체</option></select>
+        </label>
+        <label>
+          지역
+          <select id="region"><option value="">전체</option></select>
+        </label>
+        <label>
+          스탬프
+          <select id="stampState">
+            <option value="">전체</option>
+            <option value="todo">아직 안 찍은 곳</option>
+            <option value="done">찍은 곳</option>
+          </select>
+        </label>
+        <label>
+          정렬
+          <select id="sort">
+            <option value="default">기본</option>
+            <option value="name">장소명순</option>
+            <option value="region">지역순</option>
+            <option value="category">분류순</option>
+          </select>
+        </label>
+        <label class="check">
+          <input id="onlyFavs" type="checkbox" />
+          찜만 보기
+        </label>
+        <button id="reset" type="button">초기화</button>
+      </section>
+
+      <p id="summary" class="summary" aria-live="polite"></p>
+
+      <div class="layout">
+        <section aria-label="조회 결과">
+          <div id="cards" class="cards"></div>
+          <p id="empty" class="empty" hidden>조건에 맞는 데이터가 없습니다.</p>
+        </section>
+
+        <aside class="side">
+          <section class="panel">
+            <div class="panel__head">
+              <h2>스탬프 지도</h2>
+              <div class="zoom" role="group" aria-label="지도 확대/축소">
+                <button id="zoom-in" type="button" aria-label="확대">＋</button>
+                <button id="zoom-out" type="button" aria-label="축소">－</button>
+                <button id="zoom-reset" type="button">전체</button>
+              </div>
+            </div>
+            <svg id="map" viewBox="0 0 600 440" role="img" aria-label="스탬프 현황과 나만의 답사 코스 지도"></svg>
+            <ul class="legend">
+              <li><i class="lg lg--todo"></i>아직</li>
+              <li><i class="lg lg--done"></i>스탬프 완료</li>
+              <li><i class="lg lg--stop"></i>코스(번호)</li>
+            </ul>
+            <p class="hint">휠 또는 ＋/－ 로 확대, 드래그로 이동, 점을 누르면 상세 정보가 열립니다.</p>
+          </section>
+
+          <section class="panel">
+            <h2>테마 투어</h2>
+            <p class="muted">투어를 누르면 해당 장소만 모아 볼 수 있습니다. 모두 찍으면 완주 배지를 받아요.</p>
+            <ul id="tour-list" class="tours"></ul>
+          </section>
+
+          <section class="panel">
+            <div class="panel__head">
+              <h2>나만의 답사 코스</h2>
+              <button id="course-clear" type="button" disabled>코스 비우기</button>
+            </div>
+            <p id="course-summary" class="muted"></p>
+            <ol id="course-list" class="course"></ol>
+            <p id="course-empty" class="hint">카드의 ♡ 를 눌러 찜하면, 찜한 순서대로 지도에 선으로 이어집니다.</p>
+          </section>
+
+          <section class="panel">
+            <div class="panel__head">
+              <h2>최근 스탬프</h2>
+              <button id="stamp-clear" type="button" disabled>스탬프 초기화</button>
+            </div>
+            <ul id="recent" class="recent"></ul>
+            <p id="recent-empty" class="hint">아직 찍은 스탬프가 없습니다. 카드의 "스탬프 찍기"를 눌러 보세요.</p>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <dialog id="detail">
+      <article>
+        <header>
+          <h2 id="d-title"></h2>
+          <div class="d-actions">
+            <button id="d-stamp" type="button"></button>
+            <button id="d-fav" type="button"></button>
+            <button id="d-close" type="button" aria-label="닫기">✕</button>
+          </div>
+        </header>
+        <div id="d-body"></div>
+      </article>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <!-- file:// 로 열어도 동작하도록 CSV 대신 JS 로 변환한 데이터를 불러옵니다 -->
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
