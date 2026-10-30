@@ -811,6 +811,70 @@ els.detail.addEventListener('close', () => {
   renderMap(getFiltered())
 })
 
+// 제주 지역 날씨 -----------------------------------------------
+// 기상청 초단기실황 스냅샷(weather-data.js). 갱신: node update-weather.mjs
+const PTY_LABEL = { 0: '없음', 1: '비', 2: '비/눈', 3: '눈', 5: '빗방울', 6: '빗방울눈날림', 7: '눈날림' }
+const COMPASS = ['북', '북북동', '북동', '동북동', '동', '동남동', '남동', '남남동', '남', '남남서', '남서', '서남서', '서', '서북서', '북서', '북북서']
+const STALE_HOURS = 3 // 관측이 이보다 오래되면 "오래된 자료" 로 표시
+
+function weatherIcon(w) {
+  if ([3, 7].includes(w.precipType)) return '❄️'
+  if ([2, 6].includes(w.precipType)) return '🌨️'
+  if ([1, 5].includes(w.precipType)) return '🌧️'
+  return w.temperature !== null && w.temperature >= 28 ? '☀️' : '🌤️'
+}
+
+// 오늘 스탬프 투어를 다닐 때 참고할 한 줄 안내
+function weatherTip(items) {
+  const hot = (f) => items.some(f)
+  if (hot((w) => [1, 5].includes(w.precipType))) return '☔ 비가 내리고 있어요. 우산을 챙기고, 야외 유적은 날씨가 갠 뒤에 들러 보세요.'
+  if (hot((w) => [3, 7].includes(w.precipType))) return '❄️ 눈이 내리고 있어요. 한라산 인근과 오름 방문은 길이 미끄러울 수 있으니 주의하세요.'
+  if (hot((w) => [2, 6].includes(w.precipType))) return '🌨️ 비/눈이 섞여 내려요. 방수되는 신발과 우산을 준비하세요.'
+  if (hot((w) => (w.windSpeed ?? 0) >= 9)) return '💨 바람이 강해요. 해안과 오름 방문은 조심하고, 모자나 가벼운 소지품을 챙기세요.'
+  if (hot((w) => w.temperature !== null && w.temperature <= 3)) return '🧣 쌀쌀해요. 따뜻하게 입고 오래 걷는 코스는 천천히 다니세요.'
+  if (hot((w) => w.temperature !== null && w.temperature >= 28)) return '🥵 더워요. 물을 챙기고 한낮 야외 이동은 줄여 보세요.'
+  return '✅ 탐방하기 좋은 날씨예요. 스탬프 투어를 시작해 보세요!'
+}
+
+function renderWeather() {
+  const box = $('weather')
+  const weather = window.JEJU_WEATHER
+  if (!weather?.items?.length) return // 데이터가 없으면 패널을 숨긴 채 둠
+  box.hidden = false
+
+  $('weather-cards').replaceChildren(
+    ...weather.items.map((w) => {
+      const compass = w.windDir === null ? '' : `${COMPASS[Math.round(w.windDir / 22.5) % 16]}풍 `
+      const stats = [
+        ['💧', `습도 ${w.humidity ?? '-'}%`],
+        ['☔', w.precipType ? `${PTY_LABEL[w.precipType] ?? '강수'} ${w.rain1h ?? 0}mm` : '강수 없음'],
+        ['🍃', `${compass}${w.windSpeed ?? '-'}m/s`],
+      ]
+      return el(
+        'div',
+        { className: 'wcard' },
+        el('span', { className: 'wcard__icon', textContent: weatherIcon(w), ariaHidden: 'true' }),
+        el(
+          'div',
+          {},
+          el('p', { className: 'wcard__name', textContent: w.name }),
+          el('p', { className: 'wcard__temp', textContent: w.temperature === null ? '-' : `${w.temperature}℃` }),
+          el('ul', { className: 'wcard__list' }, ...stats.map(([icon, text]) => el('li', { textContent: `${icon} ${text}` }))),
+        ),
+      )
+    }),
+  )
+
+  const observed = new Date(weather.items[0].observedAt)
+  const hoursOld = (Date.now() - observed.getTime()) / 3600000
+  const when = `${observed.getMonth() + 1}월 ${observed.getDate()}일 ${pad2(observed.getHours())}:00 관측`
+  const meta = $('weather-meta')
+  const stale = hoursOld > STALE_HOURS
+  meta.textContent = `${when} · 기상청 초단기실황${stale ? ' · 오래된 자료예요 (node update-weather.mjs 로 갱신)' : ''}`
+  meta.classList.toggle('stale', stale)
+  $('weather-tip').textContent = weatherTip(weather.items)
+}
+
 // 전체 렌더 --------------------------------------------------
 function render() {
   const list = getFiltered()
@@ -845,3 +909,4 @@ els.reset.addEventListener('click', () => {
 })
 
 render()
+renderWeather()

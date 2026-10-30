@@ -30,6 +30,16 @@
         <div id="region-bars" class="banner__regions"></div>
       </section>
 
+      <!-- 제주 지역 날씨 (기상청 초단기실황, weather-data.js) -->
+      <section id="weather" class="weather" aria-label="제주 지역 날씨" hidden>
+        <div class="weather__head">
+          <h2>🌤️ 제주 지역 날씨</h2>
+          <p id="weather-meta" class="weather__meta"></p>
+        </div>
+        <div id="weather-cards" class="weather__cards"></div>
+        <p id="weather-tip" class="weather__tip"></p>
+      </section>
+
       <section class="filters" aria-label="검색 조건">
         <label class="grow">
           검색어
@@ -148,6 +158,7 @@
     <!-- file:// 로 열어도 동작하도록 CSV 대신 JS 로 변환한 데이터를 불러옵니다 -->
     <script src="data.js"></script>
     <script src="jeju-outline.js"></script>
+    <script src="weather-data.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

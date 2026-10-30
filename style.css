@@ -94,6 +94,26 @@ body {
 .bar span { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--brand), var(--done)); transition: width 0.5s; }
 .mini .bar { height: 0.45rem; }
 
+/* 제주 날씨 */
+.weather {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.weather__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.25rem 1rem; margin-bottom: 0.75rem; }
+.weather__head h2 { margin: 0; font-size: 1.05rem; }
+.weather__meta { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.weather__meta.stale { color: var(--accent); font-weight: 600; }
+.weather__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; }
+.wcard { display: flex; align-items: center; gap: 0.9rem; padding: 0.75rem 0.9rem; background: var(--brand-soft); border-radius: 12px; }
+.wcard__icon { font-size: 2.4rem; line-height: 1; }
+.wcard__name { margin: 0; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.wcard__temp { margin: 0; font-size: 1.9rem; font-weight: 800; line-height: 1.15; }
+.wcard__list { display: flex; flex-wrap: wrap; gap: 0.1rem 0.8rem; margin: 0.15rem 0 0; padding: 0; list-style: none; font-size: 0.82rem; color: var(--muted); }
+.weather__tip { margin: 0.75rem 0 0; padding: 0.55rem 0.8rem; border-left: 4px solid var(--brand); border-radius: 4px; background: var(--bg); font-size: 0.9rem; }
+
 /* 검색 조건 */
 .filters {
   display: flex;
